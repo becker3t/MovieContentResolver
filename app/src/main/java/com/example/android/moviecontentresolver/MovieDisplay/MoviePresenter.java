@@ -1,10 +1,12 @@
 package com.example.android.moviecontentresolver.MovieDisplay;
 
+import android.content.ContentProviderClient;
 import android.content.ContentResolver;
 import android.content.ContentValues;
 import android.content.Context;
 import android.database.Cursor;
 import android.net.Uri;
+import android.os.RemoteException;
 import android.provider.UserDictionary;
 import android.util.Log;
 
@@ -29,12 +31,12 @@ public class MoviePresenter implements MovieContentProviderContract.Presenter {
     private MovieContentProviderContract.View view;
     private Context context;
     private ArrayList<MovieData> movieList;
-    private ContentResolver contentResolver;
+    private ContentProviderClient providerClient;
 
     public MoviePresenter(MovieContentProviderContract.View view, Context context) {
         this.view = view;
         this.context = context;
-        contentResolver = context.getContentResolver();
+        providerClient = context.getContentResolver().acquireContentProviderClient(CONTENT_AUTHORITY);
     }
 
     public void populateTables() {
@@ -51,18 +53,36 @@ public class MoviePresenter implements MovieContentProviderContract.Presenter {
 
     @Override
     public void getMovieContentData() {
-        Log.d(TAG, "getMovieContentData: ");
-
         //query movie data first
         Cursor movieCursor = queryMovieData();
-        int genreID = -1;
 
-        movieCursor.close();
+        ArrayList<MovieData> movieData = new ArrayList<>();
+
+        if(movieCursor != null) {
+            //do stuff
+            while(movieCursor.moveToNext()) {
+                MovieData movie = new MovieData();
+                movie.setName(movieCursor.getString(movieCursor.getColumnIndex(MovieUriContract.MovieEntry.COLUMN_NAME)));
+                movie.setDate(movieCursor.getString(movieCursor.getColumnIndex(MovieUriContract.MovieEntry.COLUMN_RELEASE_DATE)));
+                movie.setGenreId(movieCursor.getInt(movieCursor.getColumnIndex(MovieUriContract.MovieEntry.COLUMN_GENRE)));
+            }
+            movieCursor.close();
+        }
 
         //query genre data next, using the GenreId in Movie Data
-        Cursor genreCursor = queryGenreData(genreID);
+        for (MovieData movie : movieData) {
+            Cursor genreCursor = queryGenreData(movie.getGenreId());
 
-        genreCursor.close();
+            if(genreCursor != null) {
+                //do stuff
+                if (genreCursor.moveToFirst()) {
+                    movie.setGenre(movieCursor.getString(movieCursor.getColumnIndex(MovieUriContract.GenreEntry.COLUMN_NAME)));
+                }
+                genreCursor.close();
+            }
+        }
+
+        view.updateMovieDataView(movieData);
     }
 
 //    public void createGenreTable() {
@@ -76,66 +96,92 @@ public class MoviePresenter implements MovieContentProviderContract.Presenter {
     public void putGenreData(String genreName) {
         ContentValues genreValues = new ContentValues();
         genreValues.put(MovieUriContract.GenreEntry.COLUMN_NAME, genreName);
-        contentResolver.update(
-                MovieUriContract.GenreEntry.CONTENT_URI,
-                genreValues,
-                null,
-                null);
+        try {
+            providerClient.update(
+                    MovieUriContract.GenreEntry.CONTENT_URI,
+                    genreValues,
+                    null,
+                    null);
+        } catch (RemoteException e) {
+            e.printStackTrace();
+        }
     }
 
     public void putMovieData(String movieName, String movieDate, String genre) {
         //get _ID of genre string
         String[] columns = {MovieUriContract.GenreEntry._ID, MovieUriContract.GenreEntry.COLUMN_NAME};
-        Cursor cursor = contentResolver.query(
-                MovieUriContract.GenreEntry.CONTENT_URI,
-                columns,
-                null,
-                null,
-                null
-        );
 
-        int genreId = -1;
-        if(cursor.moveToFirst()) {
-            genreId = cursor.getColumnIndex(genre);
-        }
-        cursor.close();
-
-        if(genreId >= 0) {
-            ContentValues movieValues = new ContentValues();
-            movieValues.put(MovieUriContract.MovieEntry.COLUMN_NAME, movieName);
-            movieValues.put(MovieUriContract.MovieEntry.COLUMN_RELEASE_DATE, movieDate);
-            movieValues.put(MovieUriContract.MovieEntry.COLUMN_GENRE, genreId);
-            contentResolver.update(
+        try{
+            Cursor cursor = providerClient.query(
                     MovieUriContract.GenreEntry.CONTENT_URI,
-                    movieValues,
+                    columns,
                     null,
-                    null);
-        }
-        else {
-            view.setErrorMessage();
+                    null,
+                    null
+            );
+
+            int genreId = -1;
+            if(cursor.moveToFirst()) {
+                genreId = cursor.getColumnIndex(genre);
+            }
+            cursor.close();
+
+            if(genreId >= 0) {
+                ContentValues movieValues = new ContentValues();
+                movieValues.put(MovieUriContract.MovieEntry.COLUMN_NAME, movieName);
+                movieValues.put(MovieUriContract.MovieEntry.COLUMN_RELEASE_DATE, movieDate);
+                movieValues.put(MovieUriContract.MovieEntry.COLUMN_GENRE, genreId);
+                providerClient.update(
+                        MovieUriContract.GenreEntry.CONTENT_URI,
+                        movieValues,
+                        null,
+                        null);
+            }
+            else {
+                view.setErrorMessage();
+            }
+        } catch (RemoteException e) {
+            e.printStackTrace();
         }
     }
 
     public Cursor queryGenreData(int index) {
         String[] columns = {MovieUriContract.GenreEntry.COLUMN_NAME};
-        return contentResolver.query(
-                MovieUriContract.GenreEntry.CONTENT_URI,
-                columns,
-                "WHERE _ID == " + index,
-                null,
-                null
-        );
+
+        Cursor returnCursor = null;
+
+        try {
+            returnCursor = providerClient.query(
+                    MovieUriContract.GenreEntry.CONTENT_URI,
+                    columns,
+                    "WHERE _ID == " + index,
+                    null,
+                    null
+            );
+        } catch (RemoteException e) {
+            e.printStackTrace();
+        }
+
+        return returnCursor;
     }
 
     public Cursor queryMovieData() {
         String[] columns = {MovieUriContract.MovieEntry.COLUMN_NAME, MovieUriContract.MovieEntry.COLUMN_GENRE, MovieUriContract.MovieEntry.COLUMN_RELEASE_DATE};
 
-        return contentResolver.query(
-                MovieUriContract.MovieEntry.CONTENT_URI,
-                columns,
-                null,
-                null,
-                null
-        );
+        Cursor returnCursor = null;
+
+        try {
+            returnCursor = providerClient.query(
+                    MovieUriContract.MovieEntry.CONTENT_URI,
+                    columns,
+                    null,
+                    null,
+                    null
+            );
+        } catch (RemoteException e) {
+            e.printStackTrace();
+        }
+
+        return returnCursor;
     }
 }

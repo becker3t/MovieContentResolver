@@ -3,6 +3,7 @@ package com.example.android.moviecontentresolver.MovieDisplay;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.support.v7.widget.RecyclerView;
+import android.util.Log;
 
 import com.example.android.moviecontentresolver.Objects.MovieData;
 import com.example.android.moviecontentresolver.R;
@@ -10,6 +11,8 @@ import com.example.android.moviecontentresolver.R;
 import java.util.ArrayList;
 
 public class MainActivity extends AppCompatActivity implements MovieContentProviderContract.View {
+
+    public static final String TAG = MainActivity.class.getSimpleName() + "_TAG";
 
     RecyclerView movieRecyclerView;
     MoviePresenter presenter;
@@ -38,6 +41,6 @@ public class MainActivity extends AppCompatActivity implements MovieContentProvi
 
     @Override
     public void setErrorMessage() {
-
+        Log.d(TAG, "setErrorMessage: Error doing stuff");
     }
 }

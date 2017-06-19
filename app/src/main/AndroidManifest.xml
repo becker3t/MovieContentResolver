@@ -1,9 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.example.android.moviecontentresolver">
-    
-    <uses-permission android:name="android.permission.READ_USER_DICTIONARY"/>
-    <uses-permission android:name="android.permission.WRITE_USER_DICTIONARY"/>
+
 
     <application
         android:allowBackup="true"
@@ -19,6 +17,12 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <provider android:name=".MovieProvider"
+            android:authorities="com.mac.training.movieapp"
+            android:readPermission="android.permission.permRead"
+            android:exported="true" >
+        </provider>
     </application>
 
 </manifest>
